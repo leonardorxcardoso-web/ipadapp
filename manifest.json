@@ -1,0 +1,19 @@
+{
+  "name": "Controle de Entrega FGV",
+  "short_name": "Entrega FGV",
+  "description": "Controle de entrega de materiais com assinatura digital e banco offline",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#004b87",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

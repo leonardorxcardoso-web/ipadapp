@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Entrega FGV" />
+  <meta name="theme-color" content="#004b87" />
+  <title>Controle de Entrega FGV</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+
+  <!-- Bibliotecas para leitura/escrita de Excel (.xlsx/.csv) e geração de .ZIP (cacheadas offline pelo Service Worker) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    /* --- CUSTOMIZAÇÃO ESTÉTICA (FLAT DESIGN E CORES FGV) --- */
+    :root {
+      --fgv-blue: #004b87;
+      --fgv-dark: #003366;
+      --fgv-light-bg: #F4F7F9;
+      --fgv-border: #EAEAEA;
+      --fgv-card-bg: #FAFAFA;
+      --danger: #d9534f;
+      --success-bg: #dff0d8;
+      --success-text: #2b542c;
+      --success-border: #3c763d;
+      --warn-bg: #fcf8e3;
+      --warn-text: #8a6d3b;
+      --warn-border: #f0ad4e;
+    }
+
+    * {
+      box-sizing: border-box;
+      border-radius: 0px !important;
+      box-shadow: none !important;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #FFFFFF;
+      color: #262730;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .container {
+      max-width: 730px;
+      margin: 0 auto;
+      padding: 24px 20px 60px 20px;
+    }
+
+    /* Status Offline Badge */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .offline-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      background-color: var(--fgv-light-bg);
+      color: var(--fgv-dark);
+      border-left: 3px solid var(--fgv-blue);
+    }
+
+    .offline-badge.ready {
+      border-left-color: #2e7d32;
+      color: #1b5e20;
+      background-color: #edf7ed;
+    }
+
+    /* Cabeçalho */
+    .logo-img {
+      width: 180px;
+      height: auto;
+      display: block;
+    }
+
+    .logo-fallback {
+      color: var(--fgv-blue);
+      font-weight: bold;
+      font-size: 20px;
+      display: none;
+    }
+
+    h2.app-title {
+      color: var(--fgv-blue);
+      margin-top: 8px;
+      margin-bottom: 18px;
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    h3.section-title {
+      color: var(--fgv-blue);
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    hr.divider {
+      border: 0;
+      border-top: 1px solid #E6EAF1;
+      margin: 22px 0;
+    }
+
+    /* Alertas estilo Streamlit */
+    .st-alert {
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .st-alert-info {
+      border-left: 4px solid var(--fgv-blue);
+      background-color: var(--fgv-light-bg);
+      color: var(--fgv-dark);
+    }
+
+    .st-alert-success {
+      border-left: 4px solid var(--success-border);
+      background-color: var(--success-bg);
+      color: var(--success-text);
+    }
+
+    .st-alert-warning {
+      border-left: 4px solid var(--warn-border);
+      background-color: var(--warn-bg);
+      color: var(--warn-text);
+    }
+
+    /* Uploader */
+    .uploader-box {
+      border: 1px dashed #CCCCCC;
+      background-color: var(--fgv-card-bg);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .uploader-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #262730;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      font-size: 14px;
+      padding: 8px;
+      background: #FFFFFF;
+      border: 1px solid #CCCCCC;
+    }
+
+    /* Botões */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 11px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s, color 0.15s;
+      text-align: center;
+      user-select: none;
+    }
+
+    .btn-primary {
+      background-color: var(--fgv-blue);
+      color: #FFFFFF;
+      border: none;
+    }
+
+    .btn-primary:hover, .btn-primary:active {
+      background-color: var(--fgv-dark);
+    }
+
+    .btn-secondary {
+      background-color: #FFFFFF;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .btn-secondary:hover, .btn-secondary:active {
+      background-color: var(--danger);
+      color: #FFFFFF;
+    }
+
+    .btn-neutral {
+      background-color: var(--fgv-light-bg);
+      color: var(--fgv-blue);
+      border: 1px solid #CCCCCC;
+    }
+
+    .btn-neutral:active {
+      background-color: var(--fgv-blue);
+      color: #FFFFFF;
+    }
+
+    /* Dashboard Métricas */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .metric-card {
+      border-left: 4px solid var(--fgv-blue);
+      padding: 12px 15px;
+      background-color: var(--fgv-light-bg);
+    }
+
+    .metric-label {
+      font-size: 13px;
+      color: #555555;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #262730;
+    }
+
+    /* Input de Busca */
+    .search-group {
+      margin-bottom: 18px;
+    }
+
+    .search-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .text-input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 15px;
+      border: 1px solid #CCCCCC;
+      background-color: #FFFFFF;
+      outline: none;
+    }
+
+    .text-input:focus {
+      border-color: var(--fgv-blue);
+      outline: 1px solid var(--fgv-blue);
+    }
+
+    /* Abas (Tabs) Padrão FGV */
+    .tabs-bar {
+      display: flex;
+      border-bottom: 2px solid #E6EAF1;
+      margin-bottom: 16px;
+      gap: 24px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 10px 4px;
+      margin-bottom: -2px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #666666;
+      cursor: pointer;
+    }
+
+    .tab-btn:hover {
+      color: var(--fgv-blue);
+    }
+
+    .tab-btn.active {
+      color: var(--fgv-blue);
+      border-bottom-color: var(--fgv-blue);
+    }
+
+    /* Expanders (Cards de Colaboradores) */
+    details.expander {
+      border: 1px solid var(--fgv-border);
+      background-color: var(--fgv-card-bg);
+      margin-bottom: 10px;
+    }
+
+    details.expander summary {
+      padding: 13px 15px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #262730;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    details.expander summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details.expander summary::after {
+      content: "▾";
+      font-size: 16px;
+      color: var(--fgv-blue);
+    }
+
+    details.expander[open] summary::after {
+      content: "▴";
+    }
+
+    .expander-body {
+      padding: 14px 15px 16px 15px;
+      border-top: 1px solid var(--fgv-border);
+      background-color: #FFFFFF;
+    }
+
+    .colab-header {
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+
+    .colab-meta {
+      font-size: 13px;
+      color: #666666;
+    }
+
+    .colab-name {
+      font-size: 18px;
+      color: var(--fgv-blue);
+      margin-top: 4px;
+    }
+
+    .previsto-line {
+      font-size: 14px;
+      margin: 10px 0 12px 0;
+    }
+
+    /* Number Inputs Touch-Friendly para iPad */
+    .inputs-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .num-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #333333;
+    }
+
+    .num-control {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid #CCCCCC;
+      background-color: #FFFFFF;
+    }
+
+    .num-control input {
+      width: 100%;
+      border: none;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 8px 4px;
+      outline: none;
+      min-width: 0;
+    }
+
+    .num-step {
+      width: 38px;
+      background-color: var(--fgv-light-bg);
+      color: var(--fgv-blue);
+      border: none;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .num-step.minus {
+      border-right: 1px solid #CCCCCC;
+    }
+
+    .num-step.plus {
+      border-left: 1px solid #CCCCCC;
+    }
+
+    .num-step:active {
+      background-color: var(--fgv-blue);
+      color: #FFFFFF;
+    }
+
+    /* Downloads Grid */
+    .downloads-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    /* Modal de Assinatura Digital */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #FFFFFF;
+      border: 2px solid var(--fgv-blue);
+      width: 100%;
+      max-width: 520px;
+      padding: 20px;
+    }
+
+    .modal-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--fgv-blue);
+      margin: 0 0 12px 0;
+    }
+
+    .canvas-wrapper {
+      border: 2px solid #CCCCCC;
+      background-color: #FFFFFF;
+      margin: 10px 0 8px 0;
+      position: relative;
+      width: 100%;
+      height: 180px;
+    }
+
+    #signatureCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none; /* Impede rolagem da tela ao assinar com dedo ou Apple Pencil */
+      cursor: crosshair;
+    }
+
+    .canvas-tools {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 14px;
+    }
+
+    .btn-clear-canvas {
+      background: #F4F7F9;
+      border: 1px solid #CCCCCC;
+      color: #333333;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 560px) {
+      .metrics-grid, .inputs-grid, .downloads-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Barra superior com status offline -->
+    <div class="top-bar">
+      <div>
+        <img src="logo_fgv.png" alt="Logo FGV" class="logo-img" onerror="this.style.display='none'; document.getElementById('logoFallback').style.display='block';" />
+        <div id="logoFallback" class="logo-fallback">[LOGO FGV]</div>
+      </div>
+      <div id="offlineBadge" class="offline-badge">⏳ Preparando modo offline...</div>
+    </div>
+
+    <h2 class="app-title">Controle de entrega de materiais</h2>
+
+    <div class="st-alert st-alert-info">
+      Carregue a base de itinerantes para iniciar a operação. Todos os registros e assinaturas ficam salvos automaticamente no banco interno do iPad (funciona 100% offline).
+    </div>
+
+    <!-- Upload de Planilha -->
+    <div class="uploader-box">
+      <label class="uploader-label" for="fileUpload">📥 Subir Planilha (Excel ou CSV)</label>
+      <input type="file" id="fileUpload" accept=".csv,.xlsx,.xls" />
+      <div id="replacePrompt" class="hidden" style="margin-top: 12px;">
+        <button id="btnConfirmReplace" class="btn btn-secondary">🔄 Substituir base atual no banco por esta nova planilha</button>
+      </div>
+    </div>
+
+    <!-- Conteúdo Principal (visível quando há dados no IndexedDB) -->
+    <div id="mainApp" class="hidden">
+      <hr class="divider" />
+      <h3 class="section-title">📊 Painel de Acompanhamento</h3>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">👥 Total Previsto</div>
+          <div class="metric-value" id="metricTotal">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">✅ Entregues</div>
+          <div class="metric-value" id="metricEntregues">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">⏳ Faltam</div>
+          <div class="metric-value" id="metricFaltam">0</div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Barra de Pesquisa -->
+      <div class="search-group">
+        <label class="search-label" for="searchInput">🔍 Buscar por Nome, UF ou Município:</label>
+        <input type="text" id="searchInput" class="text-input" placeholder="Digite o nome, UF ou município..." autocomplete="off" />
+      </div>
+
+      <!-- Abas Pendentes / Finalizados -->
+      <div class="tabs-bar">
+        <button id="tabPendentes" class="tab-btn active" onclick="switchTab('pendentes')">⏳ Pendentes (0)</button>
+        <button id="tabFinalizados" class="tab-btn" onclick="switchTab('finalizados')">✅ Finalizados (0)</button>
+      </div>
+
+      <!-- Lista Pendentes -->
+      <div id="panePendentes"></div>
+
+      <!-- Lista Finalizados -->
+      <div id="paneFinalizados" class="hidden"></div>
+
+      <!-- Área de Download -->
+      <hr class="divider" />
+      <h3 class="section-title">Encerrar Operação (Downloads)</h3>
+      <div class="st-alert st-alert-warning">
+        ⚠️ Lembre-se de baixar a Planilha e as Assinaturas ao fim da operação para não perder os dados!
+      </div>
+
+      <div class="downloads-grid">
+        <button id="btnDownloadExcel" class="btn btn-primary">💾 Baixar Planilha Atualizada</button>
+        <button id="btnDownloadZip" class="btn btn-primary">🗂️ Baixar Assinaturas (.ZIP)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Assinatura Digital -->
+  <div id="signatureModal" class="modal-backdrop">
+    <div class="modal-box">
+      <h4 class="modal-title">✍️ Coleta de Assinatura do Colaborador</h4>
+      <div id="modalColabInfo" style="margin-bottom: 8px; font-size: 14px;"></div>
+      <div style="font-size: 14px; color: #333333;">
+        Por favor, solicite que o colaborador desenhe sua rubrica ou assinatura no quadro abaixo:
+      </div>
+
+      <div class="canvas-wrapper">
+        <canvas id="signatureCanvas"></canvas>
+      </div>
+      <div class="canvas-tools">
+        <button type="button" id="btnClearCanvas" class="btn-clear-canvas">🧹 Limpar quadro</button>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btnSaveSignature" class="btn btn-primary">Salvar e Confirmar</button>
+        <button type="button" id="btnCancelSignature" class="btn btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================
+    // 1. BANCO DE DADOS OFFLINE PERSISTENTE NO IPAD (INDEXEDDB)
+    // =========================================================
+    const DB_NAME = "FGVControleEntregaDB";
+    const DB_VERSION = 1;
+    const STORE_NAME = "entregas";
+
+    let dbInstance = null;
+    let allRecords = [];
+    let currentTab = "pendentes";
+    let pendingUploadRows = null;
+    let activeModalContext = null;
+
+    function openDatabase() {
+      return new Promise((resolve, reject) => {
+        if (dbInstance) return resolve(dbInstance);
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: "_id", autoIncrement: true });
+          }
+        };
+        request.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          resolve(dbInstance);
+        };
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    async function getAllRecords() {
+      const db = await openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function replaceAllRecords(rows) {
+      const db = await openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        store.clear();
+        rows.forEach((r) => {
+          const cleanRow = { ...r };
+          delete cleanRow._id;
+          if (!cleanRow.Status) cleanRow.Status = "Pendente";
+          if (cleanRow.Detector_Previsto === undefined || cleanRow.Detector_Previsto === null || cleanRow.Detector_Previsto === "") {
+            cleanRow.Detector_Previsto = 0;
+          }
+          store.add(cleanRow);
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function updateRecord(record) {
+      const db = await openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        store.put(record);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    // =========================================================
+    // 2. UTILITÁRIOS (IGUAIS AO PYTHON ORIGINAL)
+    // =========================================================
+    function sanitizarNome(nome) {
+      const nomeStr = String(nome ?? "");
+      const nomeLimpo = nomeStr.replace(/[^a-zA-Z0-9À-ÖØ-öø-ÿ\s]/g, "");
+      return nomeLimpo.trim().replace(/ /g, "_");
+    }
+
+    function formatDateTimeBR(dateObj = new Date()) {
+      const pad = (n) => String(n).padStart(2, "0");
+      const d = pad(dateObj.getDate());
+      const m = pad(dateObj.getMonth() + 1);
+      const y = dateObj.getFullYear();
+      const hh = pad(dateObj.getHours());
+      const mm = pad(dateObj.getMinutes());
+      const ss = pad(dateObj.getSeconds());
+      return {
+        display: `${d}/${m}/${y} ${hh}:${mm}:${ss}`,
+        fileFull: `${d}${m}${y}_${hh}${mm}${ss}`,
+        fileShort: `${d}${m}${y}_${hh}${mm}`
+      };
+    }
+
+    function escapeHTML(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function toInt(val, fallback = 0) {
+      const n = parseInt(val, 10);
+      return isNaN(n) ? fallback : n;
+    }
+
+    // =========================================================
+    // 3. LEITURA DE PLANILHA (EXCEL OU CSV)
+    // =========================================================
+    document.getElementById("fileUpload").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheet = workbook.SheetNames[0];
+          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { defval: "" });
+
+          if (!rows.length) {
+            alert("A planilha enviada está vazia.");
+            return;
+          }
+
+          if (allRecords.length === 0) {
+            await replaceAllRecords(rows);
+            await reloadAndRender();
+          } else {
+            pendingUploadRows = rows;
+            document.getElementById("replacePrompt").classList.remove("hidden");
+          }
+        } catch (err) {
+          alert("Erro ao ler a planilha: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    document.getElementById("btnConfirmReplace").addEventListener("click", async () => {
+      if (!pendingUploadRows) return;
+      await replaceAllRecords(pendingUploadRows);
+      pendingUploadRows = null;
+      document.getElementById("replacePrompt").classList.add("hidden");
+      await reloadAndRender();
+    });
+
+    // =========================================================
+    // 4. RENDERIZAÇÃO DA INTERFACE (DASHBOARD, BUSCA E ABAS)
+    // =========================================================
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById("tabPendentes").classList.toggle("active", tab === "pendentes");
+      document.getElementById("tabFinalizados").classList.toggle("active", tab === "finalizados");
+      document.getElementById("panePendentes").classList.toggle("hidden", tab !== "pendentes");
+      document.getElementById("paneFinalizados").classList.toggle("hidden", tab !== "finalizados");
+    }
+
+    document.getElementById("searchInput").addEventListener("input", () => {
+      renderUI();
+    });
+
+    async function reloadAndRender() {
+      allRecords = await getAllRecords();
+      renderUI();
+    }
+
+    function renderUI() {
+      const mainApp = document.getElementById("mainApp");
+      if (!allRecords.length) {
+        mainApp.classList.add("hidden");
+        return;
+      }
+      mainApp.classList.remove("hidden");
+
+      // Métricas Globais
+      const totalPessoas = allRecords.length;
+      const totalEntregues = allRecords.filter((r) => r.Status === "Entregue").length;
+      const totalFaltam = totalPessoas - totalEntregues;
+
+      document.getElementById("metricTotal").textContent = totalPessoas;
+      document.getElementById("metricEntregues").textContent = totalEntregues;
+      document.getElementById("metricFaltam").textContent = totalFaltam;
+
+      // Filtro de Busca
+      const busca = document.getElementById("searchInput").value.trim().toLowerCase();
+      const filtrados = busca
+        ? allRecords.filter((r) => {
+            const nome = String(r.Nome ?? "").toLowerCase();
+            const uf = String(r.UF ?? "").toLowerCase();
+            const mun = String(r.Municipio ?? "").toLowerCase();
+            return nome.includes(busca) || uf.includes(busca) || mun.includes(busca);
+          })
+        : allRecords;
+
+      const pendentes = filtrados.filter((r) => r.Status !== "Entregue");
+      const finalizados = filtrados.filter((r) => r.Status === "Entregue");
+
+      document.getElementById("tabPendentes").textContent = `⏳ Pendentes (${pendentes.length})`;
+      document.getElementById("tabFinalizados").textContent = `✅ Finalizados (${finalizados.length})`;
+
+      renderPendentes(pendentes);
+      renderFinalizados(finalizados);
+    }
+
+    function stepValue(inputId, delta) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      const current = toInt(el.value, 0);
+      const next = Math.max(0, current + delta);
+      el.value = next;
+    }
+
+    function renderPendentes(lista) {
+      const container = document.getElementById("panePendentes");
+      if (!lista.length) {
+        container.innerHTML = `<div class="st-alert st-alert-success">Nenhum material pendente encontrado para esta busca! 🎉</div>`;
+        return;
+      }
+
+      container.innerHTML = lista.map((row) => {
+        const id = row._id;
+        const cPrev = toInt(row.Caixas_Previstas, 0);
+        const mPrev = toInt(row.Malotes_Previstos, 0);
+        const dPrev = toInt(row.Detector_Previsto, 0);
+
+        return `
+          <details class="expander">
+            <summary>${escapeHTML(row.Nome)} (${escapeHTML(row.Municipio)}-${escapeHTML(row.UF)})</summary>
+            <div class="expander-body">
+              <div class="colab-header">
+                <div class="colab-meta">UF: <b>${escapeHTML(row.UF)}</b></div>
+                <div class="colab-meta">Município: <b>${escapeHTML(row.Municipio)}</b></div>
+                <div class="colab-name">Nome: <b>${escapeHTML(row.Nome)}</b></div>
+              </div>
+
+              <div class="previsto-line">
+                <b>Previsto:</b> ${cPrev} Caixas | ${mPrev} Malotes | ${dPrev} Detectores
+              </div>
+
+              <div class="inputs-grid">
+                <div class="num-field">
+                  <label>Caixas Reais</label>
+                  <div class="num-control">
+                    <button type="button" class="num-step minus" onclick="stepValue('c_${id}', -1)">−</button>
+                    <input type="number" id="c_${id}" min="0" value="${cPrev}" inputmode="numeric" />
+                    <button type="button" class="num-step plus" onclick="stepValue('c_${id}', 1)">+</button>
+                  </div>
+                </div>
+                <div class="num-field">
+                  <label>Malotes Reais</label>
+                  <div class="num-control">
+                    <button type="button" class="num-step minus" onclick="stepValue('m_${id}', -1)">−</button>
+                    <input type="number" id="m_${id}" min="0" value="${mPrev}" inputmode="numeric" />
+                    <button type="button" class="num-step plus" onclick="stepValue('m_${id}', 1)">+</button>
+                  </div>
+                </div>
+                <div class="num-field">
+                  <label>Detectores Reais</label>
+                  <div class="num-control">
+                    <button type="button" class="num-step minus" onclick="stepValue('d_${id}', -1)">−</button>
+                    <input type="number" id="d_${id}" min="0" value="${dPrev}" inputmode="numeric" />
+                    <button type="button" class="num-step plus" onclick="stepValue('d_${id}', 1)">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" class="btn btn-primary" onclick="openSignatureModal(${id})">
+                Confirmar Entrega (Check)
+              </button>
+            </div>
+          </details>
+        `;
+      }).join("");
+    }
+
+    function renderFinalizados(lista) {
+      const container = document.getElementById("paneFinalizados");
+      if (!lista.length) {
+        container.innerHTML = `<div class="st-alert st-alert-info">Nenhuma entrega finalizada ainda.</div>`;
+        return;
+      }
+
+      container.innerHTML = lista.map((row) => {
+        const id = row._id;
+        const cEnt = toInt(row.Caixas_Entregues, 0);
+        const mEnt = toInt(row.Malotes_Entregues, 0);
+        const dEnt = toInt(row.Detector_Entregue, 0);
+        const temAssinatura = Boolean(row.Arquivo_Assinatura);
+
+        return `
+          <details class="expander">
+            <summary>${escapeHTML(row.Nome)} (${escapeHTML(row.Municipio)}-${escapeHTML(row.UF)}) ✓ [ENTREGUE]</summary>
+            <div class="expander-body">
+              <div class="colab-header">
+                <div class="colab-meta">UF: <b>${escapeHTML(row.UF)}</b></div>
+                <div class="colab-meta">Município: <b>${escapeHTML(row.Municipio)}</b></div>
+                <div class="colab-name">Nome: <b>${escapeHTML(row.Nome)}</b></div>
+              </div>
+
+              <div class="st-alert st-alert-success">
+                Entregue e registrado às: ${escapeHTML(row.Data_Hora_Check)}
+              </div>
+
+              <div class="previsto-line">
+                <b>Volumes Finais:</b> ${cEnt} Caixas | ${mEnt} Malotes | ${dEnt} Detectores
+              </div>
+
+              ${temAssinatura ? `<div class="st-alert st-alert-info">📝 Assinatura digital capturada e armazenada com sucesso.</div>` : ""}
+
+              <button type="button" class="btn btn-secondary" onclick="restaurarCheck(${id})">
+                Restaurar Check (Corrigir)
+              </button>
+            </div>
+          </details>
+        `;
+      }).join("");
+    }
+
+    async function restaurarCheck(id) {
+      const row = allRecords.find((r) => r._id === id);
+      if (!row) return;
+      row.Caixas_Entregues = "";
+      row.Malotes_Entregues = "";
+      row.Detector_Entregue = "";
+      row.Data_Hora_Check = "";
+      row.Status = "Pendente";
+      row.Arquivo_Assinatura = "";
+      delete row._signatureDataUrl;
+
+      await updateRecord(row);
+      await reloadAndRender();
+    }
+
+    // =========================================================
+    // 5. MODAL DE ASSINATURA DIGITAL (DEDO OU APPLE PENCIL)
+    // =========================================================
+    const canvas = document.getElementById("signatureCanvas");
+    const ctx = canvas.getContext("2d");
+    let isDrawing = false;
+
+    function resizeAndClearCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+
+      // Fundo branco sólido (igual ao st_canvas background_color="#FFFFFF")
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, rect.width, rect.height);
+
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+    }
+
+    function getCanvasPoint(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      isDrawing = true;
+      const pt = getCanvasPoint(e);
+      ctx.beginPath();
+      ctx.moveTo(pt.x, pt.y);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const pt = getCanvasPoint(e);
+      ctx.lineTo(pt.x, pt.y);
+      ctx.stroke();
+    });
+
+    canvas.addEventListener("pointerup", (e) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      isDrawing = false;
+      ctx.closePath();
+    });
+
+    canvas.addEventListener("pointercancel", () => {
+      isDrawing = false;
+    });
+
+    document.getElementById("btnClearCanvas").addEventListener("click", () => {
+      resizeAndClearCanvas();
+    });
+
+    function openSignatureModal(id) {
+      const row = allRecords.find((r) => r._id === id);
+      if (!row) return;
+
+      const novasCaixas = Math.max(0, toInt(document.getElementById(`c_${id}`).value, 0));
+      const novosMalotes = Math.max(0, toInt(document.getElementById(`m_${id}`).value, 0));
+      const novosDetectores = Math.max(0, toInt(document.getElementById(`d_${id}`).value, 0));
+
+      activeModalContext = { id, novasCaixas, novosMalotes, novosDetectores };
+
+      document.getElementById("modalColabInfo").innerHTML =
+        `Colaborador: <b>${escapeHTML(row.Nome)}</b> (${escapeHTML(row.Municipio)}-${escapeHTML(row.UF)})`;
+
+      document.getElementById("signatureModal").classList.add("open");
+      requestAnimationFrame(() => resizeAndClearCanvas());
+    }
+
+    document.getElementById("btnCancelSignature").addEventListener("click", () => {
+      activeModalContext = null;
+      document.getElementById("signatureModal").classList.remove("open");
+    });
+
+    document.getElementById("btnSaveSignature").addEventListener("click", async () => {
+      if (!activeModalContext) return;
+      const { id, novasCaixas, novosMalotes, novosDetectores } = activeModalContext;
+      const row = allRecords.find((r) => r._id === id);
+      if (!row) return;
+
+      const dt = formatDateTimeBR(new Date());
+      const nomeFormatado = sanitizarNome(row.Nome);
+      const filename = `assinaturas/assinatura_${nomeFormatado}_${dt.fileFull}.png`;
+      const dataUrl = canvas.toDataURL("image/png");
+
+      row.Caixas_Entregues = novasCaixas;
+      row.Malotes_Entregues = novosMalotes;
+      row.Detector_Entregue = novosDetectores;
+      row.Data_Hora_Check = dt.display;
+      row.Status = "Entregue";
+      row.Arquivo_Assinatura = filename;
+      row._signatureDataUrl = dataUrl;
+
+      await updateRecord(row);
+      activeModalContext = null;
+      document.getElementById("signatureModal").classList.remove("open");
+      await reloadAndRender();
+    });
+
+    // =========================================================
+    // 6. EXPORTAÇÃO DA PLANILHA (.XLSX) E ASSINATURAS (.ZIP)
+    // =========================================================
+    document.getElementById("btnDownloadExcel").addEventListener("click", () => {
+      if (!allRecords.length) return;
+      const dt = formatDateTimeBR(new Date());
+
+      const exportData = allRecords.map((r) => {
+        const copy = { ...r };
+        delete copy._id;
+        delete copy._signatureDataUrl;
+        return copy;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Logistica_Executada");
+      XLSX.writeFile(workbook, `controle_materiais_${dt.fileShort}.xlsx`);
+    });
+
+    document.getElementById("btnDownloadZip").addEventListener("click", async () => {
+      const dt = formatDateTimeBR(new Date());
+      const zip = new JSZip();
+
+      allRecords.forEach((r) => {
+        if (r.Status === "Entregue" && r._signatureDataUrl && r.Arquivo_Assinatura) {
+          const base64Data = r._signatureDataUrl.split(",")[1];
+          const baseFilename = r.Arquivo_Assinatura.split("/").pop();
+          zip.file(baseFilename, base64Data, { base64: true });
+        }
+      });
+
+      const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `assinaturas_fgv_${dt.fileShort}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    });
+
+    // =========================================================
+    // 7. REGISTRO DO SERVICE WORKER PARA MODO 100% OFFLINE
+    // =========================================================
+    async function setupOfflinePWA() {
+      const badge = document.getElementById("offlineBadge");
+      if ("serviceWorker" in navigator) {
+        try {
+          const reg = await navigator.serviceWorker.register("./sw.js");
+          await navigator.serviceWorker.ready;
+          badge.textContent = "🟢 Pronto para uso Offline";
+          badge.classList.add("ready");
+        } catch (err) {
+          badge.textContent = "⚠️ Abra via link HTTPS para ativar modo offline";
+        }
+      } else {
+        badge.textContent = "⚠️ Navegador sem suporte a cache offline";
+      }
+    }
+
+    // Inicialização
+    window.addEventListener("DOMContentLoaded", async () => {
+      await reloadAndRender();
+      await setupOfflinePWA();
+    });
+  </script>
+</body>
+</html>

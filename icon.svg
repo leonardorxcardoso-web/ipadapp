@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#004b87"/>
+  <rect x="36" y="36" width="440" height="440" fill="none" stroke="#FFFFFF" stroke-width="10" opacity="0.35"/>
+  <text x="256" y="245" font-family="Arial, Helvetica, sans-serif" font-size="132" font-weight="bold" fill="#FFFFFF" text-anchor="middle">FGV</text>
+  <text x="256" y="325" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" fill="#DCE8F2" text-anchor="middle" letter-spacing="3">LOGÍSTICA</text>
+</svg>

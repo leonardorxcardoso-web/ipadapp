@@ -1,0 +1,23 @@
+====================================================================
+CONTROLE DE ENTREGA FGV — APP OFFLINE PARA IPAD (PWA + INDEXEDDB)
+====================================================================
+
+1. ARQUIVOS INCLUÍDOS NESTE PACOTE:
+   - index.html      -> Aplicação completa (visual FGV, banco IndexedDB, assinatura e exportação Excel/ZIP)
+   - manifest.json   -> Configuração de instalação em tela cheia no iPadOS
+   - sw.js           -> Service Worker que salva todo o app no cache interno do iPad para uso sem internet
+   - icon.svg        -> Ícone do aplicativo na Tela de Início do iPad
+   (Opcional: coloque o arquivo "logo_fgv.png" nesta mesma pasta para exibir a logo oficial no topo)
+
+2. COMO PUBLICAR GRATUITAMENTE EM 2 MINUTOS (PARA INSTALAR NO IPAD):
+   Como o iPad exige um endereço HTTPS na primeira abertura para liberar o botão "Adicionar à Tela de Início" e ativar o cache offline:
+   a) Crie um repositório no GitHub (pode ser público ou privado com GitHub Pages) e envie esses arquivos (e o logo_fgv.png, se desejar).
+   b) Ative o GitHub Pages nas configurações do repositório (Settings > Pages > Branch: main).
+   c) Você receberá um link HTTPS (ex.: https://seuusuario.github.io/controle-entrega-fgv/).
+
+3. COMO INSTALAR NO IPAD E GARANTIR O MODO 100% OFFLINE:
+   a) Com o iPad conectado à internet uma única vez, abra o link HTTPS no navegador SAFARI.
+   b) Aguarde 3 segundos até o selo no canto superior direito ficar verde: "🟢 Pronto para uso Offline".
+   c) Toque no ícone de Compartilhar do Safari (quadrado com seta para cima) -> "Adicionar à Tela de Início".
+   d) Pronto! Agora você pode colocar o iPad em Modo Avião e abrir o app pelo ícone na Tela de Início.
+   e) Carregue a planilha (.xlsx ou .csv) antes ou durante a operação. Tudo ficará salvo no banco IndexedDB do iPad até você exportar o Excel e o ZIP ao final.
